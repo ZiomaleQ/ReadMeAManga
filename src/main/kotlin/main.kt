@@ -17,58 +17,43 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import club.minnced.discord.rpc.DiscordRPC
-import club.minnced.discord.rpc.DiscordRichPresence
 import scrappers.Manganato
 import scrappers.Scrapper
 import java.net.URL
 import java.util.*
 
-val reader = MangaReader(ViewersManager(), settings = Settings(), DiscordRPC.INSTANCE)
+class MangaReader(
+    val viewersManager: ViewersManager = ViewersManager(),
+    val settings: Settings = Settings(),
+    var presenceClient: DiscordPresence = DiscordPresence()
+)
+
+val reader = MangaReader()
 
 fun main() = Window(
     title = "Read Me A Manga",
     size = IntSize(1280, 768)
 ) {
-    initPresence()
-    theme()
+    MaterialTheme { MangaReaderView(reader) }
 }
-
-//TODO: Change it to different lib
-/** Just initiate Discord RPC */
-fun initPresence() {
-    reader.presenceClient.initialize("622783718783844356")
-
-    val presence = DiscordRichPresence()
-    presence.startTimestamp = System.currentTimeMillis() / 1000 // epoch second
-    presence.details = "Read me a manga"
-
-    reader.presenceClient.Discord_UpdatePresence(presence)
-}
-
-@Composable
-fun theme() {
-    MaterialTheme {
-        MangaReaderView(reader)
-    }
-}
-
-class MangaReader(val viewersManager: ViewersManager, val settings: Settings, var presenceClient: DiscordRPC)
 
 @Composable
 fun MangaReaderView(model: MangaReader) {
     Box {
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                for (viewer in model.viewersManager.viewers) {
-                    ViewersTabView(viewer)
-                }
+                model.viewersManager.viewers.forEach { ViewersTabView(it) }
             }
 
             Box(Modifier.weight(1f)) {
-                ViewerView(model.viewersManager.active!!)
+                model.viewersManager.active!!.toView()
             }
-            StatusBar()
+
+            Box(Modifier.height(32.dp).fillMaxWidth().padding(4.dp)) {
+                Row(Modifier.fillMaxHeight().align(Alignment.CenterEnd)) {
+                    createStatus("Discord", Icons.Default.Done, "It's okay!")
+                }
+            }
         }
     }
 }
@@ -120,18 +105,9 @@ fun ViewersTabView(model: Viewer) = Surface(
             .padding(4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        model.title.intoTextComponent(Modifier.padding(horizontal = 4.dp))
 
-        when (model) {
-            is MangaViewer -> model.manga.name
-            is MainPage -> "Main page"
-            is SearchPage -> "Search results"
-            is ChapterViewer -> "${model.chapter.manga.name} - ${model.chapter.name}"
-            else -> ""
-        }.intoTextComponent(Modifier.padding(horizontal = 4.dp))
-
-        val close = if (model is CloseableViewer) model.close else null
-
-        if (close != null) {
+        if ((model as? CloseableViewer)?.close != null) {
             Icon(
                 Icons.Default.Close,
                 tint = LocalContentColor.current,
@@ -140,7 +116,7 @@ fun ViewersTabView(model: Viewer) = Surface(
                     .size(24.dp)
                     .padding(4.dp)
                     .clickable {
-                        close()
+                        model.close?.let { it() }
                     }
             )
         } else {
@@ -151,15 +127,6 @@ fun ViewersTabView(model: Viewer) = Surface(
             )
         }
     }
-}
-
-@Composable
-fun ViewerView(model: Viewer) = when (model) {
-    is MangaViewer -> MangaInfo(model)
-    is MainPage -> MangaBrowser()
-    is SearchPage -> SearchResult(model)
-    is ChapterViewer -> ChapterInfo(model)
-    else -> Unit
 }
 
 @Composable
@@ -327,10 +294,45 @@ class ViewersManager {
     }
 }
 
-class MainPage : Viewer(ViewerState.PICKER)
-class SearchPage(val query: String) : CloseableViewer(ViewerState.SEARCH)
-class MangaViewer(val manga: Manga) : CloseableViewer(ViewerState.MANGA)
-class ChapterViewer(val chapter: Chapter) : CloseableViewer(ViewerState.READER)
+class MainPage : Viewer(ViewerState.PICKER) {
+    override val title: String
+        get() = "Main page"
+
+    @Composable
+    override fun toView() {
+        MangaBrowser()
+    }
+}
+
+class SearchPage(val query: String) : CloseableViewer(ViewerState.SEARCH) {
+    override val title: String
+        get() = "Search results"
+
+    @Composable
+    override fun toView() {
+        SearchResult(this)
+    }
+}
+
+class MangaViewer(val manga: Manga) : CloseableViewer(ViewerState.MANGA) {
+    override val title: String
+        get() = manga.name
+
+    @Composable
+    override fun toView() {
+        MangaInfo(this)
+    }
+}
+
+class ChapterViewer(val chapter: Chapter) : CloseableViewer(ViewerState.READER) {
+    override val title: String
+        get() = "${chapter.manga.name} - ${chapter.name}"
+
+    @Composable
+    override fun toView() {
+        ChapterInfo(this)
+    }
+}
 
 open class CloseableViewer(state: ViewerState) : Viewer(state) {
     var close: (() -> Unit)? = null
@@ -342,9 +344,18 @@ open class Viewer(open var state: ViewerState) {
     val isActive: Boolean
         get() = selection.selected === this
 
+    open val title: String = ""
+    @Suppress("UNNECESSARY_SAFE_CALL")
     fun activate() {
         selection.selected = this
+        reader?.presenceClient?.updatePresence(
+            "Read me a manga",
+            if (title.length > 100) "${title.subSequence(0, 97)}..." else title
+        )
     }
+
+    @Composable
+    open fun toView(): Unit = Unit
 }
 
 class SingleSelection {
@@ -353,18 +364,6 @@ class SingleSelection {
 
 class Settings {
     var mangaPerRow = 5
-}
-
-@Composable
-fun StatusBar() = Box(
-    Modifier
-        .height(32.dp)
-        .fillMaxWidth()
-        .padding(4.dp)
-) {
-    Row(Modifier.fillMaxHeight().align(Alignment.CenterEnd)) {
-        createStatus("Discord", Icons.Default.Done, "It's okay!")
-    }
 }
 
 @Composable
@@ -409,7 +408,6 @@ fun String.intoTextComponent(modifier: Modifier? = null) = Text(
 
 private operator fun TextUnit.minus(other: TextUnit) = (value - other.value).sp
 private operator fun TextUnit.div(other: TextUnit) = value / other.value
-private fun DiscordRPC.initialize(applicationID: String) = this.Discord_Initialize(applicationID, null, false, null)
 
 data class Manga(
     val name: String,
