@@ -9,9 +9,9 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
@@ -68,7 +68,22 @@ fun MangaBrowser() {
         Row(Modifier.padding(10.dp).fillMaxWidth()) {
             "Searching for something? ".intoTextComponent()
             var text by remember { mutableStateOf("") }
-            BasicTextField(value = text, onValueChange = { text = it })
+            BasicTextField(
+                value = text,
+                onValueChange = { text = it },
+                singleLine = true,
+                modifier = Modifier.size(100.dp, 36.dp).padding(4.dp).drawBehind {
+                    val strokeWidth = 2f
+                    val y = size.height - strokeWidth
+
+                    drawLine(
+                        Color.Gray,
+                        Offset(0f, y),
+                        Offset(size.width, y),
+                        strokeWidth
+                    )
+                }
+            )
             Icon(
                 Icons.Default.PlayArrow,
                 tint = LocalContentColor.current,
@@ -345,6 +360,7 @@ open class Viewer(open var state: ViewerState) {
         get() = selection.selected === this
 
     open val title: String = ""
+
     @Suppress("UNNECESSARY_SAFE_CALL")
     fun activate() {
         selection.selected = this
