@@ -2,6 +2,7 @@ package scrappers
 
 import Chapter
 import Manga
+import reader
 import java.net.URL
 import java.util.*
 
@@ -13,7 +14,7 @@ class Manganato : Scrapper("https://manganato.com") {
             val bannerURL = it.children()[0].attr("src")
             val infoPage = it.selectFirst(".text-nowrap").attr("href")
             val name = it.children()[0].attr("alt")
-            Manga(name, bannerURL, mutableListOf(), infoPage, this, UUID.randomUUID())
+            Manga(name, bannerURL, mutableListOf(), infoPage, this, UUID.randomUUID(), preview = true)
         }
     }
 
@@ -24,7 +25,7 @@ class Manganato : Scrapper("https://manganato.com") {
             val bannerURL = it.child(0).child(0).attr("src")
             val infoPage = it.child(0).attr("href")
             val name = it.selectFirst(".item-title").children()[0].ownText()
-            Manga(name, bannerURL, mutableListOf(), infoPage, this, UUID.randomUUID())
+            Manga(name, bannerURL, mutableListOf(), infoPage, this, UUID.randomUUID(), preview = true)
         }
     }
 
@@ -39,13 +40,15 @@ class Manganato : Scrapper("https://manganato.com") {
             it.substring(it.length - "</br>".length)
         }
 
+        val hasAlternative = document.select(".table-label").text() == "Alternative :"
+
         val name = document.select("h1").text()
-        val alternative = tableInfo[0].text().split(";")
+        val alternative = if (hasAlternative) tableInfo[0].text().split(";") else listOf()
         val cover = document.select(".info-image").select(".img-loading").attr("src")
-        val author = tableInfo[1].text()
-        val description = rawDescription.removeSurrounding("${'"'}")
-        val genres = tableInfo[2].select("a.a-h").map { it.text() }
-        val status = tableInfo[2].text()
+        val author = tableInfo[if (hasAlternative) 1 else 0].text()
+        val description = rawDescription.replace("<br>", "\n").removeSurrounding("${'"'}")
+        val genres = tableInfo[if (hasAlternative) 3 else 2].select("a.a-h").map { it.text() }
+        val status = tableInfo[if (hasAlternative) 2 else 1].text()
 
         val manga = Manga(
             name,
@@ -58,7 +61,8 @@ class Manganato : Scrapper("https://manganato.com") {
             author,
             description,
             genres,
-            status
+            status,
+            preview = false
         )
 
         document.select(".chapter-name").forEach {
@@ -69,7 +73,7 @@ class Manganato : Scrapper("https://manganato.com") {
             manga.addChapter(text, num, mutableListOf(), it.attr("href"))
         }
 
-        return manga
+        return reader.addManga(manga)
     }
 
     override fun getChapter(chapter: Chapter): Chapter {
@@ -94,7 +98,7 @@ class Manganato : Scrapper("https://manganato.com") {
             val infoPage = it.child(0).attr("href")
             val name = it.selectFirst(".item-title").selectFirst("a").text()
 
-            Manga(name, bannerURL, mutableListOf(), infoPage, this, UUID.randomUUID())
+            Manga(name, bannerURL, mutableListOf(), infoPage, this, UUID.randomUUID(), preview = true)
         }
     }
 }

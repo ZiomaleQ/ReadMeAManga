@@ -6,7 +6,7 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import java.net.URL
 
-abstract class Scrapper(private val url: String) {
+abstract class Scrapper(val url: String) {
     private val cache = HashMap<String, String>()
 
     abstract fun popular(): List<Manga>
