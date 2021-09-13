@@ -29,8 +29,8 @@ class Manganato : Scrapper("https://manganato.com") {
         }
     }
 
-    override fun getInfo(url: URL): Manga {
-        val document = getDocument(url)
+    override fun getInfo(url: URL, refresh: Boolean): Manga {
+        val document = getDocument(url, refresh)
 
         val tableInfo = document.select(".table-value")
         var rawDescription =
@@ -76,9 +76,9 @@ class Manganato : Scrapper("https://manganato.com") {
         return reader.addManga(manga)
     }
 
-    override fun getChapter(chapter: Chapter): Chapter {
+    override fun getChapter(chapter: Chapter, refresh: Boolean): Chapter {
 
-        val document = getDocument(URL(chapter.infoPage))
+        val document = getDocument(URL(chapter.infoPage), refresh)
 
         document
             .selectFirst(".container-chapter-reader")
@@ -91,7 +91,7 @@ class Manganato : Scrapper("https://manganato.com") {
 
     override fun search(query: String): List<Manga> {
 
-        val document = this.getDocument("/search/story/$query")
+        val document = getDocument("/search/story/$query", true)
 
         return document.select(".search-story-item").map {
             val bannerURL = it.child(0).child(0).attr("src")

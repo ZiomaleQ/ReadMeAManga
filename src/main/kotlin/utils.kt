@@ -54,4 +54,5 @@ fun File.createIfNot(kind: FileKind): Boolean {
         FileKind.FILE -> this.createNewFile()
     }
 }
+
 enum class FileKind { DIR, FILE }

@@ -11,8 +11,8 @@ abstract class Scrapper(val url: String) {
 
     abstract fun popular(): List<Manga>
     abstract fun recentlyUpdated(): List<Manga>
-    abstract fun getInfo(url: URL): Manga
-    abstract fun getChapter(chapter: Chapter): Chapter
+    abstract fun getInfo(url: URL, refresh: Boolean = false): Manga
+    abstract fun getChapter(chapter: Chapter, refresh: Boolean = false): Chapter
     abstract fun search(query: String): List<Manga>
 
     fun getDocument(path: String = "", refresh: Boolean = false): Document =

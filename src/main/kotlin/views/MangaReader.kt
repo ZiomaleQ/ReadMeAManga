@@ -4,8 +4,6 @@ import Chapter
 import DiscordPresence
 import FileKind
 import Manga
-import Settings
-import ViewersManager
 import ViewersTabView
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -15,6 +13,7 @@ import androidx.compose.material.LocalContentColor
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
@@ -31,7 +30,6 @@ import java.util.*
 
 class MangaReader(
     val viewersManager: ViewersManager = ViewersManager(),
-    val settings: Settings = Settings(),
     var presenceClient: DiscordPresence = DiscordPresence()
 ) {
     val imageCache = HashMap<String, ImageBitmap>()
@@ -39,31 +37,46 @@ class MangaReader(
     val defaultDir = File(System.getProperty("user.home"), ".rmam")
     val defaultImageDir = File(defaultDir, "images")
     val defaultMangaDir = File(defaultDir, "manga")
+    val libraryFile = File(defaultDir, "library.props")
+    val settings: Settings = Settings()
+
+    val lastRead = mutableStateListOf<UUID>()
 
     init {
         if (!defaultDir.exists()) defaultDir.mkdir()
         if (!defaultImageDir.exists()) defaultImageDir.mkdir()
         if (!defaultMangaDir.exists()) defaultMangaDir.mkdir()
 
+        libraryFile.createIfNot(FileKind.FILE)
+        val props = libraryFile.inputStream().use { Properties().apply { load(it) } }
+
+        settings.init(this)
+
         for (manga in defaultMangaDir.listFiles()!!) loadManga(manga)
+        lastRead.addAll(
+            (props.getOrDefault("lastRead", "") as String)
+                .split("|")
+                .mapNotNull { if (it.isNotEmpty()) UUID.fromString(it) else null }
+        )
     }
 
     @Composable
-    fun createView() {
-        Box {
-            Column(Modifier.fillMaxSize()) {
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                    viewersManager.viewers.forEach { ViewersTabView(it) }
-                }
+    fun createView() = Box {
+        Column(Modifier.fillMaxSize()) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+                viewersManager.viewers.forEach { ViewersTabView(it) }
+            }
 
-                Box(Modifier.weight(1f)) {
-                    viewersManager.active!!.toView()
-                }
+            Box(Modifier.weight(1f)) {
+                viewersManager.active!!.toView()
+            }
 
-                Box(Modifier.height(32.dp).fillMaxWidth().padding(4.dp)) {
-                    Row(Modifier.fillMaxHeight().align(Alignment.CenterEnd)) {
-                        createStatus("Discord", Icons.Default.Done, "It's okay!")
-                    }
+            Box(Modifier.height(32.dp).fillMaxWidth().padding(4.dp)) {
+                Row(Modifier.fillMaxHeight().align(Alignment.CenterStart)) {
+                    for (status in viewersManager.active!!.statuses) createStatus(status)
+                }
+                Row(Modifier.fillMaxHeight().align(Alignment.CenterEnd)) {
+                    createStatus(IconStatus("Discord", Icons.Default.Done))
                 }
             }
         }
@@ -119,6 +132,34 @@ class MangaReader(
         return manga
     }
 
+    fun updateManga(manga: Manga) {
+        val oldManga = mangaCache.values.find {
+            it.provider.url == manga.provider.url && it.infoPage == manga.infoPage
+        } ?: return Unit.also { addManga(manga) }
+        manga.uuid = oldManga.uuid
+
+        val chapters = manga.chapterList.map { newChapter ->
+            val oldChapter = oldManga.chapterList.find { it.infoPage == newChapter.infoPage }
+            if (oldChapter == null) return@map newChapter.also { addChapter(oldManga.getDir(), newChapter) }
+            else {
+                newChapter.uuid = oldChapter.uuid
+
+                val stream = newChapter.getInfo().outputStream()
+                stream.use { newChapter.toProperties().store(it, "Chapter info") }
+
+                newChapter
+            }
+        }
+
+        manga.chapterList.clear()
+        manga.chapterList.addAll(chapters)
+
+        mangaCache[manga.uuid] = manga
+
+        val stream = oldManga.getInfo().outputStream()
+        stream.use { manga.toProperties().store(it, "Manga info") }
+    }
+
     fun loadManga(file: File) {
         val mangaInfoFile = File(file, "info.props")
         if (!mangaInfoFile.exists()) {
@@ -170,14 +211,36 @@ class MangaReader(
     }
 }
 
-@Composable
-fun RowScope.createStatus(name: String, icon: ImageVector, description: String) {
-    name.intoTextComponent(Modifier.align(Alignment.CenterVertically))
-    Spacer(Modifier.width(8.dp))
-    Icon(
-        icon,
-        tint = LocalContentColor.current,
-        contentDescription = description,
-        modifier = Modifier.size(24.dp).padding(4.dp)
-    )
+class Settings {
+    var settingsFile = File("")
+    val mangaPerRow = 5
+
+    fun init(mangaReader: MangaReader) {
+        settingsFile = File(mangaReader.defaultDir, "settings.props")
+        settingsFile.createIfNot(FileKind.FILE)
+    }
 }
+
+@Composable
+fun RowScope.createStatus(status: Status) = when (status) {
+    is IconStatus -> {
+        status.name.intoTextComponent(Modifier.align(Alignment.CenterVertically))
+        Spacer(Modifier.width(8.dp))
+        Icon(
+            status.icon,
+            tint = LocalContentColor.current,
+            contentDescription = "${status.name} description",
+            modifier = Modifier.size(24.dp).padding(4.dp)
+        )
+    }
+    is TextStatus -> {
+        status.name.intoTextComponent(Modifier.align(Alignment.CenterVertically))
+        Spacer(Modifier.width(8.dp))
+        status.text.intoTextComponent(Modifier.align(Alignment.CenterVertically))
+    }
+    else -> Unit
+}
+
+interface Status
+data class IconStatus(var name: String, var icon: ImageVector) : Status
+data class TextStatus(var name: String, var text: String) : Status
