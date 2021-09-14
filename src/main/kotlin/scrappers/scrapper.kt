@@ -1,7 +1,5 @@
 package scrappers
 
-import Chapter
-import Manga
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import java.net.URL

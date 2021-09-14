@@ -1,13 +1,10 @@
 package views
 
-import Chapter
+import scrappers.Chapter
 import DiscordPresence
 import FileKind
-import Manga
-import ViewersTabView
-import androidx.compose.foundation.horizontalScroll
+import scrappers.Manga
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.Icon
 import androidx.compose.material.LocalContentColor
 import androidx.compose.material.icons.Icons
@@ -63,9 +60,7 @@ class MangaReader(
     @Composable
     fun createView() = Box {
         Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                viewersManager.viewers.forEach { ViewersTabView(it) }
-            }
+            viewersManager.createView()
 
             Box(Modifier.weight(1f)) {
                 viewersManager.active!!.toView()

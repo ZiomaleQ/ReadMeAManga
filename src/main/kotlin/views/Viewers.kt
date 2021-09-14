@@ -1,13 +1,26 @@
 package views
 
-import Chapter
-import ChapterViewer
-import CloseableViewer
 import MainPage
-import Manga
 import MangaViewer
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.Icon
+import androidx.compose.material.LocalContentColor
+import androidx.compose.material.Surface
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import intoTextComponent
 import reader
+import scrappers.Chapter
+import scrappers.Manga
 
 class ViewersManager {
     private val selection = SingleSelection()
@@ -79,6 +92,35 @@ class ViewersManager {
         viewers.add(index, newView)
         newView.activate()
     }
+
+    @Composable
+    fun createView() = Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+        viewers.forEach {
+            Surface(color = if (it.isActive) Color.LightGray else Color.Transparent) {
+
+                Row(
+                    Modifier
+                        .clickable(remember { MutableInteractionSource() }, indication = null) { it.activate() }
+                        .padding(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    it.title.intoTextComponent(Modifier.padding(horizontal = 4.dp))
+
+                    if ((it as? CloseableViewer)?.close != null) {
+                        Icon(
+                            Icons.Default.Close,
+                            tint = LocalContentColor.current,
+                            contentDescription = "Close",
+                            modifier = Modifier.size(24.dp).padding(4.dp).clickable { it.close?.let { it() } }
+                        )
+                    } else {
+                        Box(modifier = Modifier.size(24.dp).padding(4.dp))
+                    }
+                }
+
+            }
+        }
+    }
 }
 
 open class Viewer(open var state: ViewerState) {
@@ -109,3 +151,6 @@ class SingleSelection {
 }
 
 enum class ViewerState { PICKER, SEARCH, MANGA, READER }
+open class CloseableViewer(state: ViewerState) : Viewer(state) {
+    var close: (() -> Unit)? = null
+}

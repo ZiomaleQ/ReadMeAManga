@@ -56,3 +56,4 @@ fun File.createIfNot(kind: FileKind): Boolean {
 }
 
 enum class FileKind { DIR, FILE }
+enum class BorderSide { LEFT, RIGHT, TOP, BOTTOM }

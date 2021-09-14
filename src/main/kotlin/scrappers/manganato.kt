@@ -1,7 +1,5 @@
 package scrappers
 
-import Chapter
-import Manga
 import reader
 import java.net.URL
 import java.util.*

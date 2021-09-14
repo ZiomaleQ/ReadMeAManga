@@ -1,6 +1,5 @@
 import androidx.compose.desktop.Window
 import androidx.compose.foundation.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.Icon
@@ -8,22 +7,23 @@ import androidx.compose.material.LocalContentColor
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import scrappers.Manga
 import scrappers.Manganato
-import scrappers.Scrapper
+import scrappers.UserStatus
+import views.CloseableViewer
 import views.MangaReader
-import views.TextStatus
 import views.Viewer
 import views.ViewerState
-import java.io.File
 import java.net.URL
-import java.util.*
 
 val reader = MangaReader()
 
@@ -73,129 +73,6 @@ fun MangaBrowser() {
             }
         }
     }
-}
-
-@Composable
-fun ViewersTabView(model: Viewer) = Surface(
-    color = if (model.isActive) Color.LightGray
-    else Color.Transparent
-) {
-    Row(
-        Modifier
-            .clickable(remember { MutableInteractionSource() }, indication = null) { model.activate() }
-            .padding(4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        model.title.intoTextComponent(Modifier.padding(horizontal = 4.dp))
-
-        if ((model as? CloseableViewer)?.close != null) {
-            Icon(
-                Icons.Default.Close,
-                tint = LocalContentColor.current,
-                contentDescription = "Close",
-                modifier = Modifier
-                    .size(24.dp)
-                    .padding(4.dp)
-                    .clickable {
-                        model.close?.let { it() }
-                    }
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(24.dp, 24.dp)
-                    .padding(4.dp)
-            )
-        }
-    }
-}
-
-@Composable
-fun ChapterInfo(model: ChapterViewer) = Row(Modifier.fillMaxWidth()) {
-
-    val chapter = if (model.chapter.panes.isNotEmpty()) model.chapter else Manganato().getChapter(model.chapter)
-
-    var pageNumber by remember { mutableStateOf(0) }
-
-    if (model.statuses.size == 0) {
-        model.statuses.add(TextStatus("Progress", "${pageNumber + 1} / ${chapter.panes.size + 1}"))
-    }
-
-    Column(Modifier.fillMaxHeight()) {
-        Icon(
-            Icons.Default.KeyboardArrowLeft,
-            tint = LocalContentColor.current,
-            contentDescription = "Left",
-            modifier = Modifier.padding(4.dp).clickable {
-                if (pageNumber > 0) {
-                    pageNumber -= 1
-                    model.statuses.removeLast()
-                    model.statuses.add(TextStatus("Progress", "${pageNumber + 1} / ${chapter.panes.size + 1}"))
-                }
-            }.fillMaxWidth(0.05f)
-        )
-
-        Icon(
-            Icons.Default.ArrowBack,
-            tint = LocalContentColor.current,
-            contentDescription = "Go back (earlier chapter)",
-            modifier = Modifier.padding(4.dp).clickable {
-                val list = model.chapter.manga.chapterList
-                val index = list.indexOf(model.chapter)
-
-                //List is in reversed order
-                if (index == -1 || index + 1 >= list.size) return@clickable
-
-                val earlierChapter = list[index + 1]
-                reader.viewersManager.update(model, ChapterViewer(earlierChapter))
-
-            }.fillMaxWidth(0.05f)
-        )
-    }
-
-    val referer = URL(chapter.infoPage).let { "${it.protocol}://${it.host}" }
-
-    val bytes = reader.getImage(
-        chapter.panes[pageNumber].url,
-        referer = referer,
-        File(chapter.getDir(), "$pageNumber.${chapter.panes[pageNumber].url.split(".").last()}")
-    )
-    Column(Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).weight(1f)) {
-        Image(bytes, chapter.name, Modifier.border(1.dp, Color.Blue).fillMaxWidth())
-    }
-
-    Column(Modifier.fillMaxHeight()) {
-        Icon(
-            Icons.Default.KeyboardArrowRight,
-            tint = LocalContentColor.current,
-            contentDescription = "Right",
-            modifier = Modifier.padding(4.dp).clickable {
-                if (pageNumber < (chapter.panes.size - 1)) {
-                    pageNumber += 1
-                    model.statuses.removeLast()
-                    model.statuses.add(TextStatus("Progress", "${pageNumber + 1} / ${chapter.panes.size + 1}"))
-                }
-            }.fillMaxWidth(0.05f)
-        )
-
-        Icon(
-            Icons.Default.ArrowForward,
-            tint = LocalContentColor.current,
-            contentDescription = "Go forward (next chapter)",
-            modifier = Modifier.padding(4.dp).clickable {
-                val list = model.chapter.manga.chapterList
-                //List is in reversed order
-                val index = list.indexOf(model.chapter)
-
-                if (index == -1 || list.size - index <= 0) return@clickable
-
-                val earlierChapter = list[index - 1]
-                reader.viewersManager.update(model, ChapterViewer(earlierChapter))
-
-            }.fillMaxWidth(0.05f)
-        )
-    }
-
 }
 
 @Composable
@@ -286,9 +163,24 @@ fun MangaInfo(model: MangaViewer) = Row {
 
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
             manga.chapterList.forEach {
-                it.name.intoTextComponent(Modifier.padding(10.dp).clickable {
-                    reader.viewersManager.open(it)
-                })
+                Surface(
+                    color = when (it.userStatus) {
+                        UserStatus.DONE -> Color.LightGray
+                        UserStatus.READING -> Color.Cyan
+                        UserStatus.NONE -> Color.Transparent
+                    }
+                ) {
+                    Row {
+                        it.name.intoTextComponent(Modifier.padding(10.dp).clickable {
+                            it.userStatus = UserStatus.READING
+                            reader.viewersManager.open(it)
+                        })
+
+                        if (it.userStatus == UserStatus.READING) {
+                            "(${it.lastPage + 1})".intoTextComponent(Modifier.padding(10.dp))
+                        }
+                    }
+                }
             }
         }
     }
@@ -334,120 +226,3 @@ class MangaViewer(val manga: Manga) : CloseableViewer(ViewerState.MANGA) {
     @Composable
     override fun toView() = MangaInfo(this)
 }
-
-class ChapterViewer(val chapter: Chapter) : CloseableViewer(ViewerState.READER) {
-    override val title: String
-        get() = "${chapter.manga.name} - ${chapter.name}"
-
-    @Composable
-    override fun toView() = ChapterInfo(this)
-}
-
-open class CloseableViewer(state: ViewerState) : Viewer(state) {
-    var close: (() -> Unit)? = null
-}
-
-data class Manga(
-    val name: String,
-    val bannerUrl: String,
-    val chapterList: MutableList<Chapter>,
-    val infoPage: String,
-    val provider: Scrapper,
-    var uuid: UUID,
-    val alternativeNames: List<String> = listOf(),
-    val author: String? = null,
-    val description: String? = null,
-    val genres: List<String> = listOf(),
-    val status: String? = null,
-    val preview: Boolean = false
-) {
-    fun addChapter(name: String, number: Double, panes: MutableList<Pane>, infoPage: String) {
-        chapterList.add(Chapter(name, number, this, panes, UUID.randomUUID(), infoPage))
-    }
-
-    fun toProperties() = Properties().apply {
-        setProperty("name", name)
-        setProperty("bannerUrl", bannerUrl)
-        setProperty("infoPage", infoPage)
-        setProperty("chapterList", chapterList.joinToString("|") { it.uuid.toString() })
-        setProperty("source", provider.url)
-        setProperty("uuid", uuid.toString())
-        setProperty("alternativeNames", alternativeNames.joinToString("|"))
-        setProperty("author", author)
-        setProperty("description", description)
-        setProperty("genres", genres.joinToString("|"))
-        setProperty("status", status)
-    }
-
-    fun getDir() = File(reader.defaultMangaDir, uuid.toString())
-    fun getInfo() = File(getDir(), "info.props")
-
-    companion object {
-        fun createFromProperties(props: Properties) = Manga(
-            name = props.getProperty("name"),
-            bannerUrl = props.getProperty("bannerUrl"),
-            chapterList = mutableListOf(),
-            infoPage = props.getProperty("infoPage"),
-            provider = MangaReader.providers.find { it.url == props.getProperty("source") }!!,
-            uuid = UUID.fromString(props.getProperty("uuid")),
-            alternativeNames = props.getProperty("alternativeNames").split("|"),
-            author = props.getProperty("author"),
-            description = props.getProperty("description"),
-            genres = props.getProperty("genres").split("|"),
-            status = props.getProperty("status")
-        )
-    }
-}
-
-data class Chapter(
-    val name: String,
-    val chapterNumber: Double,
-    val manga: Manga,
-    val panes: MutableList<Pane>,
-    var uuid: UUID,
-    val infoPage: String,
-    val userStatus: UserStatus = UserStatus.NONE,
-    val lastPage: Int = 0
-) {
-    fun addPane(url: String) {
-        panes.add(Pane(url, this))
-    }
-
-    fun toProperties() = Properties().apply {
-        setProperty("name", name)
-        setProperty("number", chapterNumber.toString())
-        setProperty("uuid", uuid.toString())
-        setProperty("panes", panes.joinToString("|") { it.url })
-        setProperty("infoPage", infoPage)
-        setProperty("userStatus", userStatus.ordinal.toString())
-        setProperty("lastPage", lastPage.toString())
-    }
-
-    fun getDir() = File(manga.getDir(), uuid.toString())
-    fun getInfo() = File(getDir(), "info.props")
-
-    companion object {
-        fun createFromProperties(props: Properties, manga: Manga) = Chapter(
-            name = props.getProperty("name"),
-            chapterNumber = props.getProperty("number").toDouble(),
-            manga = manga,
-            panes = mutableListOf(),
-            uuid = UUID.fromString(props.getProperty("uuid")),
-            infoPage = props.getProperty("infoPage"),
-            userStatus = props.getProperty("userStatus")
-                .let { prop ->
-                    UserStatus.values()
-                        .find { it.ordinal == prop.toInt() }
-                }!!,
-            lastPage = props.getProperty("lastPage").toInt()
-            ).apply {
-            panes.addAll(
-                props.getProperty("panes").split("|").mapNotNull { if (it.isEmpty()) null else Pane(it, this) }
-            )
-        }
-    }
-}
-
-data class Pane(val url: String, val chapter: Chapter)
-enum class BorderSide { LEFT, RIGHT, TOP, BOTTOM }
-enum class UserStatus { NONE, READING, DONE }
