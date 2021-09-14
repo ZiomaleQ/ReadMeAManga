@@ -7,10 +7,7 @@ import androidx.compose.material.LocalContentColor
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,6 +20,7 @@ import views.CloseableViewer
 import views.MangaReader
 import views.Viewer
 import views.ViewerState
+import java.io.File
 import java.net.URL
 
 val reader = MangaReader()
@@ -68,7 +66,7 @@ fun MangaBrowser() {
                     i * reader.settings.mangaPerRow,
                     (((i + 1) * reader.settings.mangaPerRow)).coerceAtMost(mangaList.size)
                 )) {
-                    Box(Modifier.padding(10.dp)) { mangaPreview(manga) }
+                    Box(Modifier.padding(10.dp)) { mangaPreview(manga).also { reader.addManga(manga) } }
                 }
             }
         }
@@ -87,7 +85,7 @@ fun SearchResult(model: SearchPage) = Column(modifier = Modifier.fillMaxWidth().
                 i * reader.settings.mangaPerRow,
                 (((i + 1) * reader.settings.mangaPerRow)).coerceAtMost(results.size)
             )) {
-                Box(Modifier.padding(10.dp)) { mangaPreview(manga) }
+                Box(Modifier.padding(10.dp)) { mangaPreview(manga).also { reader.addManga(manga) } }
             }
         }
     }
@@ -96,7 +94,7 @@ fun SearchResult(model: SearchPage) = Column(modifier = Modifier.fillMaxWidth().
 @Composable
 fun MangaInfo(model: MangaViewer) = Row {
 
-    val manga = model.manga.provider.getInfo(URL(model.manga.infoPage))
+    val manga = model.manga.provider.getInfo(URL(model.manga.infoPage), model.manga.preview, model.manga.uuid)
 
     Column(Modifier.fillMaxWidth(0.25f).padding(horizontal = 10.dp)) {
 
@@ -110,14 +108,16 @@ fun MangaInfo(model: MangaViewer) = Row {
         Row {
 
             Icon(
-                Icons.Default.Add,
+                if (reader.library.contains(manga.uuid)) Icons.Default.Delete
+                else Icons.Default.Add,
                 tint = LocalContentColor.current,
                 contentDescription = "Add to library",
                 modifier = Modifier
                     .size(24.dp)
                     .padding(4.dp)
                     .clickable {
-                        println("Add to library")
+                        if (reader.library.contains(manga.uuid)) reader.removeFromLibrary(manga)
+                        else reader.addToLibrary(manga)
                     }
             )
 
@@ -194,7 +194,10 @@ fun mangaPreview(model: Manga) {
         )
     }) {
         if (model.bannerUrl.isNotBlank()) {
-            val bytes = reader.getImage(model.bannerUrl)
+            val bytes = reader.getImage(
+                model.bannerUrl,
+                file = File(reader.defaultImageDir, "${model.uuid}.${model.bannerUrl.split(".").last()}")
+            )
             Image(bytes, model.name, Modifier.border(1.dp, Color.Blue).size(200.dp, 310.dp))
         }
 

@@ -3,13 +3,14 @@ package scrappers
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import java.net.URL
+import java.util.*
 
 abstract class Scrapper(val url: String) {
     private val cache = HashMap<String, String>()
 
     abstract fun popular(): List<Manga>
     abstract fun recentlyUpdated(): List<Manga>
-    abstract fun getInfo(url: URL, refresh: Boolean = false): Manga
+    abstract fun getInfo(url: URL, refresh: Boolean = false, uuid: UUID = UUID.randomUUID()): Manga
     abstract fun getChapter(chapter: Chapter, refresh: Boolean = false): Chapter
     abstract fun search(query: String): List<Manga>
 

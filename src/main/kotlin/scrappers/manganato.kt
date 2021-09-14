@@ -27,7 +27,7 @@ class Manganato : Scrapper("https://manganato.com") {
         }
     }
 
-    override fun getInfo(url: URL, refresh: Boolean): Manga {
+    override fun getInfo(url: URL, refresh: Boolean, uuid: UUID): Manga {
         val document = getDocument(url, refresh)
 
         val tableInfo = document.select(".table-value")
@@ -54,7 +54,7 @@ class Manganato : Scrapper("https://manganato.com") {
             mutableListOf(),
             url.toString(),
             this,
-            UUID.randomUUID(),
+            uuid,
             alternative,
             author,
             description,
@@ -71,7 +71,7 @@ class Manganato : Scrapper("https://manganato.com") {
             manga.addChapter(text, num, mutableListOf(), it.attr("href"))
         }
 
-        return reader.addManga(manga)
+        return reader.addManga(manga, true)
     }
 
     override fun getChapter(chapter: Chapter, refresh: Boolean): Chapter {

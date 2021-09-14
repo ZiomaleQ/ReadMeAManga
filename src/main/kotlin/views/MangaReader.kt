@@ -1,9 +1,7 @@
 package views
 
-import scrappers.Chapter
 import DiscordPresence
 import FileKind
-import scrappers.Manga
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.Icon
 import androidx.compose.material.LocalContentColor
@@ -19,6 +17,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import createIfNot
 import intoTextComponent
+import scrappers.Chapter
+import scrappers.Manga
 import scrappers.Manganato
 import scrappers.Scrapper
 import java.io.File
@@ -38,6 +38,7 @@ class MangaReader(
     val settings: Settings = Settings()
 
     val lastRead = mutableStateListOf<UUID>()
+    val library = mutableStateListOf<UUID>()
 
     init {
         if (!defaultDir.exists()) defaultDir.mkdir()
@@ -52,6 +53,11 @@ class MangaReader(
         for (manga in defaultMangaDir.listFiles()!!) loadManga(manga)
         lastRead.addAll(
             (props.getOrDefault("lastRead", "") as String)
+                .split("|")
+                .mapNotNull { if (it.isNotEmpty()) UUID.fromString(it) else null }
+        )
+        library.addAll(
+            (props.getOrDefault("library", "") as String)
                 .split("|")
                 .mapNotNull { if (it.isNotEmpty()) UUID.fromString(it) else null }
         )
@@ -105,11 +111,12 @@ class MangaReader(
         return imageBitmap.also { imageCache[url] = it }
     }
 
-    fun addManga(manga: Manga): Manga {
+    fun addManga(manga: Manga, force: Boolean = false): Manga {
         val existingManga = mangaCache.values.find {
             it.provider.url == manga.provider.url && it.infoPage == manga.infoPage
         }
-        if (existingManga != null) return existingManga
+        if (!force && existingManga != null) return existingManga
+
         val id = manga.uuid.toString()
         val mangaDir = File(defaultMangaDir, id)
         mangaDir.createIfNot(FileKind.DIR)
@@ -167,8 +174,8 @@ class MangaReader(
         stream.use { properties.load(it) }
 
         val manga = Manga.createFromProperties(properties)
-
-        for (chapter in properties.getProperty("chapterList").split("|")) {
+        val chapters = properties.getProperty("chapterList").split("|").filterNot { it.isEmpty() }
+        for (chapter in chapters) {
             manga.chapterList.add(loadChapter(File(file, chapter), manga))
         }
 
@@ -196,6 +203,28 @@ class MangaReader(
         val stream = chapterInfo.outputStream()
         val properties = chapter.toProperties()
         stream.use { properties.store(it, "Chapter info") }
+    }
+
+    fun addToLibrary(manga: Manga) {
+        val props = libraryFile.inputStream().use { Properties().apply { load(it) } }
+
+        if (library.contains(manga.uuid)) return
+
+        library.add(manga.uuid)
+
+        props.setProperty("library", library.joinToString { it.toString() })
+        props.store(libraryFile.outputStream(), "Library file")
+    }
+
+    fun removeFromLibrary(manga: Manga) {
+        val props = libraryFile.inputStream().use { Properties().apply { load(it) } }
+
+        if (!library.contains(manga.uuid)) return
+
+        library.remove(manga.uuid)
+
+        props.setProperty("library", library.joinToString { it.toString() })
+        props.store(libraryFile.outputStream(), "Library file")
     }
 
     fun getManga(id: UUID): Manga? = mangaCache.get(id)

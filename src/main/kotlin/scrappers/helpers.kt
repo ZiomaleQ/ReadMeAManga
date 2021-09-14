@@ -31,10 +31,11 @@ data class Manga(
         setProperty("source", provider.url)
         setProperty("uuid", uuid.toString())
         setProperty("alternativeNames", alternativeNames.joinToString("|"))
-        setProperty("author", author)
-        setProperty("description", description)
+        setProperty("author", author ?: "")
+        setProperty("description", description ?: "")
         setProperty("genres", genres.joinToString("|"))
-        setProperty("status", status)
+        setProperty("status", status ?: "")
+        setProperty("preview", "$preview")
     }
 
     fun getDir() = File(reader.defaultMangaDir, uuid.toString())
@@ -52,7 +53,8 @@ data class Manga(
             author = props.getProperty("author"),
             description = props.getProperty("description"),
             genres = props.getProperty("genres").split("|"),
-            status = props.getProperty("status")
+            status = props.getProperty("status"),
+            preview = props.getProperty("preview") == "true"
         )
     }
 }
