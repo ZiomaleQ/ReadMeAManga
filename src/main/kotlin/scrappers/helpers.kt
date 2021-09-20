@@ -1,5 +1,15 @@
 package scrappers
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.Card
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import intoTextComponent
 import reader
 import views.MangaReader
 import java.io.File
@@ -41,11 +51,28 @@ data class Manga(
     fun getDir() = File(reader.defaultMangaDir, uuid.toString())
     fun getInfo() = File(getDir(), "info.props")
 
+    @Composable
+    fun createPreview() {
+        Card(elevation = 5.dp, modifier = Modifier.clickable { reader.viewersManager.open(this) }) {
+            Column {
+                if (bannerUrl.isNotBlank()) {
+                    val bytes = reader.getImage(
+                        bannerUrl,
+                        file = File(reader.defaultImageDir, "${uuid}.${bannerUrl.split(".").last()}")
+                    )
+                    Image(bytes, name, Modifier.size(200.dp, 310.dp))
+                }
+
+                name.intoTextComponent()
+            }
+        }
+    }
+
     companion object {
         fun createFromProperties(props: Properties) = Manga(
             name = props.getProperty("name"),
             bannerUrl = props.getProperty("bannerUrl"),
-            chapterList = mutableListOf(),
+            chapterList = mutableStateListOf(),
             infoPage = props.getProperty("infoPage"),
             provider = MangaReader.providers.find { it.url == props.getProperty("source") }!!,
             uuid = UUID.fromString(props.getProperty("uuid")),
