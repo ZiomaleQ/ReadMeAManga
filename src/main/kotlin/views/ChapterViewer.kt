@@ -11,8 +11,10 @@ import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import org.jetbrains.skia.Bitmap
 import reader
 import scrappers.Chapter
 import scrappers.UserStatus
@@ -25,6 +27,8 @@ class ChapterViewer(var chapter: Chapter) : CloseableViewer(ViewerState.READER) 
 
     private val referer: String
         get() = URL(chapter.infoPage).let { "${it.protocol}://${it.host}" }
+
+    private var jumpBy = 1
 
     @Composable
     override fun toView() = Row(Modifier.fillMaxWidth()) {
@@ -61,7 +65,7 @@ class ChapterViewer(var chapter: Chapter) : CloseableViewer(ViewerState.READER) 
 
     private fun moveLeft() {
         if (chapter.lastPage > 0) {
-            chapter.lastPage -= 1
+            chapter.lastPage -= jumpBy
             updateProgress()
         }
     }
@@ -79,10 +83,10 @@ class ChapterViewer(var chapter: Chapter) : CloseableViewer(ViewerState.READER) 
 
     private fun moveRight() {
         if (chapter.lastPage < (chapter.panes.size - 1)) {
-            chapter.lastPage += 1
+            chapter.lastPage += jumpBy
             updateProgress()
         } else {
-            if ((chapter.lastPage + 1) == (chapter.panes.size - 1)) {
+            if ((chapter.lastPage + jumpBy) == (chapter.panes.size - jumpBy)) {
                 chapter.userStatus = UserStatus.DONE
                 reader.addChapter(chapter.getDir(), chapter)
             }
@@ -108,14 +112,37 @@ class ChapterViewer(var chapter: Chapter) : CloseableViewer(ViewerState.READER) 
 
     @Composable
     private fun RowScope.createImage() {
-        val bytes = reader.getImage(
-            chapter.panes[chapter.lastPage].url,
-            referer = referer,
-            File(chapter.getDir(), "${chapter.lastPage}.${chapter.panes[chapter.lastPage].url.split(".").last()}")
-        )
+        val image = getPaneBitMap(chapter.lastPage)
 
-        Column(Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).weight(1f)) {
-            Image(bytes, chapter.name, Modifier.border(1.dp, Color.Blue).fillMaxWidth())
+        val images = mutableListOf(image)
+
+        if ((chapter.panes.size - chapter.lastPage) + 1 > 0 && image.width <= 750) {
+            images.add(getPaneBitMap(chapter.lastPage + 1))
+            chapter.lastPage++
+
+            jumpBy = 2
+        }
+
+        val mods = Modifier.fillMaxHeight().weight(1f)
+
+        if (images.size > 1) {
+            Row(Modifier.fillMaxWidth().weight(1f)) {
+                images.forEach {
+                    Column(mods) {
+                        Image(it, chapter.name, Modifier.fillMaxWidth())
+                    }
+                }
+            }
+        } else {
+            Column(mods) {
+                Image(image, chapter.name, Modifier.fillMaxWidth())
+            }
         }
     }
+
+    private fun getPaneBitMap(index: Int): ImageBitmap = reader.getImage(
+        chapter.panes[index].url,
+        referer = referer,
+        File(chapter.getDir(), "${index}.${chapter.panes[index].url.split(".").last()}")
+    )
 }

@@ -1,4 +1,3 @@
-import androidx.compose.desktop.Window
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.Icon
@@ -13,8 +12,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.singleWindowApplication
 import scrappers.Manga
 import scrappers.Manganato
 import views.CloseableViewer
@@ -25,9 +24,8 @@ import java.net.URL
 
 val reader = MangaReader()
 
-fun main() = Window(
-    title = "Read Me A Manga",
-    size = IntSize(1280, 768)
+fun main() = singleWindowApplication(
+    title = "Read Me A Manga"
 ) {
     MaterialTheme { reader.createView() }
 }
@@ -55,8 +53,6 @@ fun MangaBrowser() {
 @Composable
 fun SearchResult(model: SearchPage) = Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
     val results = Manganato().search(model.query)
-
-    "Search page for ${model.query}".intoTextComponent()
 
     for (i in 0..(Math.floorDiv(results.size, reader.settings.mangaPerRow))) {
         Row {
@@ -162,7 +158,7 @@ class MainPage : Viewer(ViewerState.PICKER) {
 
 class SearchPage(val query: String) : CloseableViewer(ViewerState.SEARCH) {
     override val title: String
-        get() = "Search results"
+        get() = "Search results - $query"
 
     @Composable
     override fun toView() = SearchResult(this)

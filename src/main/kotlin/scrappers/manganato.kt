@@ -10,7 +10,7 @@ class Manganato : Scrapper("https://manganato.com") {
 
         return document.select(".owl-item").map { it.child(0) }.map {
             val bannerURL = it.children()[0].attr("src")
-            val infoPage = it.selectFirst(".text-nowrap").attr("href")
+            val infoPage = it.selectFirst(".text-nowrap")!!.attr("href")
             val name = it.children()[0].attr("alt")
             Manga(name, bannerURL, mutableListOf(), infoPage, this, UUID.randomUUID(), preview = true)
         }
@@ -22,7 +22,7 @@ class Manganato : Scrapper("https://manganato.com") {
         return document.select(".content-homepage-item").map {
             val bannerURL = it.child(0).child(0).attr("src")
             val infoPage = it.child(0).attr("href")
-            val name = it.selectFirst(".item-title").children()[0].ownText()
+            val name = it.selectFirst(".item-title")!!.children()[0].ownText()
             Manga(name, bannerURL, mutableListOf(), infoPage, this, UUID.randomUUID(), preview = true)
         }
     }
@@ -79,8 +79,7 @@ class Manganato : Scrapper("https://manganato.com") {
         val document = getDocument(URL(chapter.infoPage), refresh)
 
         document
-            .selectFirst(".container-chapter-reader")
-            .select("img")
+            .selectFirst(".container-chapter-reader")!!.select("img")
             .map { it.attr("src") }
             .forEach { chapter.addPane(it) }
 
@@ -94,7 +93,7 @@ class Manganato : Scrapper("https://manganato.com") {
         return document.select(".search-story-item").map {
             val bannerURL = it.child(0).child(0).attr("src")
             val infoPage = it.child(0).attr("href")
-            val name = it.selectFirst(".item-title").selectFirst("a").text()
+            val name = it.selectFirst(".item-title")!!.selectFirst("a")!!.text()
 
             Manga(name, bannerURL, mutableListOf(), infoPage, this, UUID.randomUUID(), preview = true)
         }

@@ -3,8 +3,8 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.5.10"
-    id("org.jetbrains.compose") version "0.4.0"
+    kotlin("jvm") version "1.5.31"
+    id("org.jetbrains.compose") version "1.0.0-rc3"
 }
 
 group = "me.ziomaleq"
@@ -19,7 +19,7 @@ repositories {
 dependencies {
     implementation(compose.desktop.currentOs)
     implementation("club.minnced:java-discord-rpc:2.0.2")
-    implementation("org.jsoup:jsoup:1.11.3")
+    implementation("org.jsoup:jsoup:1.14.3")
 }
 
 tasks.withType<KotlinCompile>() {

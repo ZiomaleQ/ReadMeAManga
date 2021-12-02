@@ -16,12 +16,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import border
 import createIfNot
 import intoTextComponent
+import org.jetbrains.skia.Image
 import scrappers.Chapter
 import scrappers.Manga
 import scrappers.Manganato
@@ -139,7 +140,7 @@ class MangaReader(
             imagePath.readBytes()
         }
 
-        val imageBitmap = org.jetbrains.skija.Image.makeFromEncoded(bytes).asImageBitmap()
+        val imageBitmap = Image.makeFromEncoded(bytes).toComposeImageBitmap()
 
         return imageBitmap.also { imageCache[url] = it }
     }

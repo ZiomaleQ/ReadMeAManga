@@ -51,6 +51,9 @@ data class Manga(
     fun getDir() = File(reader.defaultMangaDir, uuid.toString())
     fun getInfo() = File(getDir(), "info.props")
 
+    private val shortName: String
+        get() = if (name.length > 30) "${name.take(27)}..." else name
+
     @Composable
     fun createPreview() {
         Card(elevation = 5.dp, modifier = Modifier.clickable { reader.viewersManager.open(this) }) {
@@ -63,7 +66,7 @@ data class Manga(
                     Image(bytes, name, Modifier.size(200.dp, 310.dp))
                 }
 
-                name.intoTextComponent()
+                shortName.intoTextComponent()
             }
         }
     }
