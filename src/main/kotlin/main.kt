@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.singleWindowApplication
 import scrappers.Manga
 import scrappers.Manganato
+import scrappers.UserStatus
 import views.CloseableViewer
 import views.MangaReader
 import views.Viewer
@@ -43,10 +44,6 @@ fun MangaBrowser() {
                 }
             }
         } else "Library is empty... Add some manga on manga view!".intoTextComponent()
-
-        Spacer(Modifier.height(10.dp))
-
-        "Browse sources directly:".intoTextComponent(Modifier.align(alignment = Alignment.CenterHorizontally))
     }
 }
 
@@ -69,7 +66,7 @@ fun SearchResult(model: SearchPage) = Column(modifier = Modifier.fillMaxWidth().
 @Composable
 fun MangaInfo(model: MangaViewer) = Row {
 
-    val manga = model.manga.provider.getInfo(URL(model.manga.infoPage), model.manga.preview, model.manga.uuid)
+    val manga = reader.resolveManga(model.manga)
 
     Column(Modifier.fillMaxWidth(0.25f).padding(horizontal = 10.dp)) {
 
@@ -139,9 +136,16 @@ fun MangaInfo(model: MangaViewer) = Row {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
             manga.chapterList.forEach {
                 Row {
-                    it.name.intoTextComponent(Modifier.padding(10.dp).clickable {
-                        reader.viewersManager.open(it)
-                    })
+                    Box(Modifier.padding(10.dp).clickable { reader.viewersManager.open(it) }) {
+                        val modif = when (it.userStatus) {
+                            UserStatus.DONE -> Modifier.background(Color(0x808080))
+                            UserStatus.READING -> Modifier.background(Color.LightGray)
+                            else -> Modifier
+                        }
+
+                        val title = if (it.lastPage > 0) it.name.let { name -> "$name @${it.lastPage}" } else it.name
+                        title.intoTextComponent(modif.padding(5.dp))
+                    }
                 }
             }
         }

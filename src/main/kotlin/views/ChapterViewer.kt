@@ -12,9 +12,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import org.jetbrains.skia.Bitmap
 import reader
 import scrappers.Chapter
 import scrappers.UserStatus
@@ -28,14 +26,23 @@ class ChapterViewer(var chapter: Chapter) : CloseableViewer(ViewerState.READER) 
     private val referer: String
         get() = URL(chapter.infoPage).let { "${it.protocol}://${it.host}" }
 
-    private var jumpBy = 1
-
     @Composable
     override fun toView() = Row(Modifier.fillMaxWidth()) {
         if (chapter.panes.isEmpty()) chapter = chapter.manga.provider.getChapter(chapter)
 
         if (statuses.size == 0) {
             statuses.add(TextStatus("Progress", "${chapter.lastPage + 1} / ${chapter.panes.size}"))
+        }
+
+        if (chapter.userStatus == UserStatus.NONE) {
+            chapter.userStatus = UserStatus.READING
+            updateProgress()
+        }
+
+        if (chapter.lastPage == chapter.panes.size) {
+            chapter.lastPage = 0
+            chapter.userStatus = UserStatus.DONE
+            updateProgress()
         }
 
         createColumn(true)
@@ -51,7 +58,8 @@ class ChapterViewer(var chapter: Chapter) : CloseableViewer(ViewerState.READER) 
             Icons.Default.let { if (left) it.KeyboardArrowLeft else it.KeyboardArrowRight },
             tint = LocalContentColor.current,
             contentDescription = if (left) "Left" else "Right",
-            modifier = Modifier.padding(4.dp).clickable { if (left) moveLeft() else moveRight() }.fillMaxWidth(0.05f)
+            modifier = Modifier.padding(4.dp).clickable { if (left) moveLeft() else moveRight() }
+                .fillMaxWidth(0.05f)
         )
 
         Icon(
@@ -64,10 +72,8 @@ class ChapterViewer(var chapter: Chapter) : CloseableViewer(ViewerState.READER) 
     }
 
     private fun moveLeft() {
-        if (chapter.lastPage > 0) {
-            chapter.lastPage -= jumpBy
-            updateProgress()
-        }
+        chapter.lastPage = (chapter.lastPage - 1).coerceAtLeast(0)
+        updateProgress()
     }
 
     private fun moveHardLeft() {
@@ -83,10 +89,10 @@ class ChapterViewer(var chapter: Chapter) : CloseableViewer(ViewerState.READER) 
 
     private fun moveRight() {
         if (chapter.lastPage < (chapter.panes.size - 1)) {
-            chapter.lastPage += jumpBy
+            chapter.lastPage = (chapter.lastPage + 1).coerceAtMost(chapter.panes.size - 1)
             updateProgress()
         } else {
-            if ((chapter.lastPage + jumpBy) == (chapter.panes.size - jumpBy)) {
+            if (chapter.lastPage == (chapter.panes.size - 1)) {
                 chapter.userStatus = UserStatus.DONE
                 reader.addChapter(chapter.getDir(), chapter)
             }
@@ -105,7 +111,9 @@ class ChapterViewer(var chapter: Chapter) : CloseableViewer(ViewerState.READER) 
     }
 
     private fun updateProgress() {
-        reader.addChapter(chapter.getDir(), chapter)
+        val chapterIndex = chapter.manga.chapterList.indexOfFirst { it.uuid == chapter.uuid }
+        chapter.manga.chapterList[chapterIndex] = chapter
+        reader.updateChapter(chapter.getDir(), chapter)
         statuses.removeLast()
         statuses.add(TextStatus("Progress", "${chapter.lastPage + 1} / ${chapter.panes.size}"))
     }
@@ -114,29 +122,10 @@ class ChapterViewer(var chapter: Chapter) : CloseableViewer(ViewerState.READER) 
     private fun RowScope.createImage() {
         val image = getPaneBitMap(chapter.lastPage)
 
-        val images = mutableListOf(image)
-
-        if ((chapter.panes.size - chapter.lastPage) + 1 > 0 && image.width <= 750) {
-            images.add(getPaneBitMap(chapter.lastPage + 1))
-            chapter.lastPage++
-
-            jumpBy = 2
-        }
-
         val mods = Modifier.fillMaxHeight().weight(1f)
 
-        if (images.size > 1) {
-            Row(Modifier.fillMaxWidth().weight(1f)) {
-                images.forEach {
-                    Column(mods) {
-                        Image(it, chapter.name, Modifier.fillMaxWidth())
-                    }
-                }
-            }
-        } else {
-            Column(mods) {
-                Image(image, chapter.name, Modifier.fillMaxWidth())
-            }
+        Column(mods) {
+            Image(image, chapter.name, Modifier.fillMaxWidth())
         }
     }
 

@@ -35,12 +35,12 @@ class MangaReader(
     val viewersManager: ViewersManager = ViewersManager(),
     var presenceClient: DiscordPresence = DiscordPresence()
 ) {
-    val imageCache = HashMap<String, ImageBitmap>()
-    val mangaCache = HashMap<UUID, Manga>()
+    private val imageCache = HashMap<String, ImageBitmap>()
+    private val mangaCache = HashMap<UUID, Manga>()
     val defaultDir = File(System.getProperty("user.home"), ".rmam")
     val defaultImageDir = File(defaultDir, "images")
     val defaultMangaDir = File(defaultDir, "manga")
-    val libraryFile = File(defaultDir, "library.props")
+    private val libraryFile = File(defaultDir, "library.props")
     val settings: Settings = Settings()
 
     val lastRead = mutableStateListOf<UUID>()
@@ -59,13 +59,13 @@ class MangaReader(
         for (manga in defaultMangaDir.listFiles()!!) loadManga(manga)
         lastRead.addAll(
             (props.getOrDefault("lastRead", "") as String)
-                .split("|")
-                .mapNotNull { if (it.isNotEmpty()) UUID.fromString(it) else null }
+                .split(",")
+                .mapNotNull { if (it.isNotEmpty()) UUID.fromString(it.trim()) else null }
         )
         library.addAll(
             (props.getOrDefault("library", "") as String)
-                .split("|")
-                .mapNotNull { if (it.isNotEmpty()) UUID.fromString(it) else null }
+                .split(",")
+                .mapNotNull { if (it.isNotEmpty()) UUID.fromString(it.trim()) else null }
         )
     }
 
@@ -74,7 +74,10 @@ class MangaReader(
         Column {
 
             //Toolbar
-            Row(Modifier.fillMaxWidth().height(40.dp).padding(4.dp).background(settings.theme.primaryVariant), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                Modifier.fillMaxWidth().height(40.dp).padding(4.dp).background(settings.theme.primaryVariant),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 "".intoTextComponent()
                 Row {
                     Text("Looking for something?")
@@ -135,7 +138,7 @@ class MangaReader(
                 connection.getInputStream()
             }
 
-            con.use { it.readAllBytes() }.also { imagePath.createNewFile(); imagePath.writeBytes(it) }
+            con.use { it.readAllBytes() }.also { imagePath.writeBytes(it) }
         } else {
             imagePath.readBytes()
         }
@@ -166,6 +169,12 @@ class MangaReader(
             addChapter(mangaDir, chapter)
         }
         return manga
+    }
+
+    fun resolveManga(manga: Manga): Manga {
+        val resolvedManga = getManga(manga.uuid)
+
+        return resolvedManga ?: manga.provider.getInfo(URL(manga.infoPage), true)
     }
 
     fun updateManga(manga: Manga) {
@@ -220,7 +229,6 @@ class MangaReader(
         val stream = File(file, "info.props").inputStream()
         val properties = Properties()
         stream.use { properties.load(it); }
-
         val chap = Chapter.createFromProperties(properties, manga)
         if (chap.panes.size == 0 && !chap.manga.preview) {
             chap.panes.addAll(chap.manga.provider.getChapter(chap).panes)
@@ -237,6 +245,16 @@ class MangaReader(
         val stream = chapterInfo.outputStream()
         val properties = chapter.toProperties()
         stream.use { properties.store(it, "Chapter info") }
+    }
+
+    fun updateChapter(dir: File, chapter: Chapter) {
+        val index = chapter.manga.chapterList.indexOfFirst { it.uuid == chapter.uuid }
+        if (index == -1) {
+            return
+        } else {
+            updateManga(chapter.manga)
+            addChapter(dir, chapter)
+        }
     }
 
     fun addToLibrary(manga: Manga) {
@@ -261,7 +279,7 @@ class MangaReader(
         props.store(libraryFile.outputStream(), "Library file")
     }
 
-    fun getManga(id: UUID): Manga? = mangaCache.get(id)
+    fun getManga(id: UUID): Manga? = mangaCache[id]
     fun getManga(id: String): Manga? = getManga(UUID.fromString(id))
 
     companion object {
@@ -272,6 +290,9 @@ class MangaReader(
 class Settings {
     var settingsFile = File("")
     val mangaPerRow = 5
+
+    //Just to test dark mode
+    @Suppress("ConstantConditionIf")
     val theme = if (false) darkColors() else lightColors()
 
     fun init(mangaReader: MangaReader) {
@@ -280,26 +301,34 @@ class Settings {
     }
 }
 
+
 @Composable
 fun RowScope.createStatus(status: Status) = when (status) {
     is IconStatus -> {
-        status.name.intoTextComponent(Modifier.align(Alignment.CenterVertically))
-        Spacer(Modifier.width(8.dp))
-        Icon(
-            status.icon,
-            tint = LocalContentColor.current,
-            contentDescription = "${status.name} description",
-            modifier = Modifier.size(24.dp).padding(4.dp)
-        )
+        Row(Modifier.clickable { status.onClick?.let { it() } }) {
+            status.name.intoTextComponent(Modifier.align(Alignment.CenterVertically))
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                status.icon,
+                tint = LocalContentColor.current,
+                contentDescription = "${status.name} description",
+                modifier = Modifier.size(24.dp).padding(4.dp)
+            )
+        }
     }
     is TextStatus -> {
-        status.name.intoTextComponent(Modifier.align(Alignment.CenterVertically))
-        Spacer(Modifier.width(8.dp))
-        status.text.intoTextComponent(Modifier.align(Alignment.CenterVertically))
+        Row(Modifier.clickable { status.onClick?.let { it() } }) {
+            status.name.intoTextComponent(Modifier.align(Alignment.CenterVertically))
+            Spacer(Modifier.width(8.dp))
+            status.text.intoTextComponent(Modifier.align(Alignment.CenterVertically))
+        }
     }
     else -> Unit
 }
 
-interface Status
-data class IconStatus(var name: String, var icon: ImageVector) : Status
-data class TextStatus(var name: String, var text: String) : Status
+abstract class Status {
+    var onClick: (() -> Unit)? = null
+}
+
+data class IconStatus(var name: String, var icon: ImageVector) : Status()
+data class TextStatus(var name: String, var text: String) : Status()

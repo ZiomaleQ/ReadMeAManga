@@ -9,8 +9,8 @@ class DiscordPresence {
 
         val presence = DiscordRichPresence()
         presence.startTimestamp = System.currentTimeMillis() / 1000 // epoch second
-        presence.state = "Main page:"
-        presence.details = "Read me a manga"
+        presence.state = "Main page"
+        presence.details = "ReadMeAManga"
 
         client.Discord_UpdatePresence(presence)
     }

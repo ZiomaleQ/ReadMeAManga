@@ -57,9 +57,10 @@ class ViewersManager {
     fun open(chapter: Chapter) {
         val viewer = ChapterViewer(chapter)
 
-        val exisitingViewer = viewers.filterIsInstance<ChapterViewer>().find { it.chapter.uuid == viewer.chapter.uuid }
+        val existingViewer = viewers.filterIsInstance<ChapterViewer>().find { it.chapter.uuid == viewer.chapter.uuid }
 
-        if (exisitingViewer != null) {
+        if (existingViewer != null) {
+            existingViewer.activate()
             return
         }
 
@@ -137,7 +138,7 @@ open class Viewer(open var state: ViewerState) {
     fun activate() {
         selection.selected = this
         reader?.presenceClient?.updatePresence(
-            "Read me a manga",
+            "ReadMeAManga",
             if (title.length > 100) "${title.subSequence(0, 97)}..." else title
         )
     }
